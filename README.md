@@ -1,6 +1,36 @@
-# AWS Toolkit Package
+# AWS Toolkit
 
-AWS services integration for Gravity workflow system, providing nodes for common AWS AI and document processing services.
+AWS services toolkit for Gravity workflow system providing AI-powered document processing and audio transcription capabilities.
+
+## Features
+
+### Transcribe Node
+- Convert audio to text using AWS Transcribe
+- Support for multiple audio formats (PCM, OGG-Opus, FLAC)
+- Language detection and speaker identification
+- Custom vocabulary and profanity filtering
+
+### AmazonTextract Node
+- Extract text and data from documents using Amazon Textract
+- Simple text detection and advanced document analysis
+- Table and form extraction capabilities
+- Multiple output formats (text, JSON, structured)
+- S3 integration for document processing
+
+## Installation
+
+```bash
+npm install @gravityai-dev/aws-toolkit
+```
+
+## Usage
+
+This package integrates with the Gravity workflow system through the plugin architecture. Nodes are automatically registered when the package is loaded.
+
+## Requirements
+
+- AWS credentials configured for Transcribe and Textract services
+- Node.js 18+ and TypeScript support
 
 ## Included Nodes
 
