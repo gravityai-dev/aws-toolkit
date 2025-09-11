@@ -33,14 +33,7 @@ export class AmazonTextractExecutor extends PromiseNode<AmazonTextractConfig> {
     }
 
     // Build credential context for AWS services
-    const credentialContext = {
-      workflowId: context.workflow?.id || "unknown",
-      executionId: context.executionId,
-      nodeId: context.nodeId,
-      nodeType: this.nodeType,
-      config: context.config,
-      credentials: context.credentials || {},
-    };
+    const credentialContext = this.buildCredentialContext(context);
     
     this.logger.info('Processing file with Amazon Textract', { 
       bucket: fileInput.bucket,
@@ -123,5 +116,20 @@ export class AmazonTextractExecutor extends PromiseNode<AmazonTextractConfig> {
       });
       throw error;
     }
+  }
+
+  /**
+   * Build credential context from execution context
+   */
+  private buildCredentialContext(context: NodeExecutionContext) {
+    return {
+      credentials: {
+        aws: context.credentials?.awsCredential || {},
+      },
+      nodeType: NODE_TYPE,
+      workflowId: context.workflow?.id || "",
+      executionId: context.executionId || "",
+      nodeId: context.nodeId || "",
+    };
   }
 }

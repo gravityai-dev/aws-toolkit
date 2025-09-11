@@ -41,6 +41,9 @@ export class TranscribeExecutor extends PromiseNode<TranscribeConfig> {
     });
 
     try {
+      // Build credential context for service
+      const credentialContext = this.buildCredentialContext(context);
+      
       // Call the transcribe service
       const result = await transcribeAudio({
         audioBase64,
@@ -53,7 +56,7 @@ export class TranscribeExecutor extends PromiseNode<TranscribeConfig> {
         vocabularyName: config.vocabularyName,
         filterProfanity: config.filterProfanity,
         logger: logger
-      }, context.credentials?.aws, logger);
+      }, credentialContext.credentials?.aws, logger);
 
       logger.info("Transcription completed successfully", {
         textLength: result.text.length,
@@ -71,5 +74,20 @@ export class TranscribeExecutor extends PromiseNode<TranscribeConfig> {
       });
       throw error;
     }
+  }
+
+  /**
+   * Build credential context from execution context
+   */
+  private buildCredentialContext(context: NodeExecutionContext) {
+    return {
+      credentials: {
+        aws: context.credentials?.awsCredential || {},
+      },
+      nodeType: NODE_TYPE,
+      workflowId: context.workflow?.id || "",
+      executionId: context.executionId || "",
+      nodeId: context.nodeId || "",
+    };
   }
 }

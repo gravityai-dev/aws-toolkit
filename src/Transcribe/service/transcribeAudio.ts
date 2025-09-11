@@ -1,11 +1,9 @@
 /**
- * AWS Transcribe service implementation
+ * AWS Transcribe streaming service implementation
  */
 
-import { TranscribeClient, StartTranscriptionJobCommand, GetTranscriptionJobCommand } from "@aws-sdk/client-transcribe";
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { TranscribeStreamingClient, StartStreamTranscriptionCommand } from "@aws-sdk/client-transcribe-streaming";
 import { TranscribeServiceParams, TranscribeOutput } from "../util/types";
-// Logger will be passed as parameter
 
 export async function transcribeAudio(
   params: TranscribeServiceParams,
@@ -17,15 +15,7 @@ export async function transcribeAudio(
     throw new Error("AWS credentials are required for Transcribe service");
   }
 
-  const transcribeClient = new TranscribeClient({
-    region: awsCredentials.region || "us-east-1",
-    credentials: {
-      accessKeyId: awsCredentials.accessKeyId,
-      secretAccessKey: awsCredentials.secretAccessKey,
-    },
-  });
-
-  const s3Client = new S3Client({
+  const transcribeClient = new TranscribeStreamingClient({
     region: awsCredentials.region || "us-east-1",
     credentials: {
       accessKeyId: awsCredentials.accessKeyId,
@@ -34,178 +24,102 @@ export async function transcribeAudio(
   });
 
   try {
-    // Generate unique job name
-    const jobName = `transcribe-job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const bucketName = awsCredentials.tempBucket || "gravity-temp-audio";
-    const audioKey = `audio/${jobName}.${getFileExtension(params.mediaEncoding || "pcm")}`;
+    logger.info("Starting streaming transcription", {
+      languageCode: params.languageCode,
+      autoDetectLanguage: params.autoDetectLanguage,
+      mediaEncoding: params.mediaEncoding,
+    });
 
-    // Upload audio to S3
-    logger.info("Uploading audio to S3", { bucket: bucketName, key: audioKey });
-    
+    // Convert base64 to audio buffer
     const audioBuffer = Buffer.from(params.audioBase64, 'base64');
-    await s3Client.send(new PutObjectCommand({
-      Bucket: bucketName,
-      Key: audioKey,
-      Body: audioBuffer,
-      ContentType: getContentType(params.mediaEncoding || "pcm"),
-    }));
-
-    // Start transcription job
-    const transcriptionParams: any = {
-      TranscriptionJobName: jobName,
-      LanguageCode: params.languageCode || "en-US",
-      Media: {
-        MediaFileUri: `s3://${bucketName}/${audioKey}`,
-      },
-      MediaFormat: params.mediaEncoding || "pcm",
-      OutputBucketName: bucketName,
-      OutputKey: `transcripts/${jobName}.json`,
-    };
-
-    // Add optional parameters
-    if (params.autoDetectLanguage) {
-      transcriptionParams.IdentifyLanguage = true;
-      if (params.languageOptions) {
-        transcriptionParams.LanguageOptions = params.languageOptions;
+    
+    // Create audio stream generator
+    async function* audioStream() {
+      const chunkSize = 1024 * 8; // 8KB chunks
+      for (let i = 0; i < audioBuffer.length; i += chunkSize) {
+        const chunk = audioBuffer.slice(i, i + chunkSize);
+        yield { AudioEvent: { AudioChunk: chunk } };
+        // Small delay to simulate streaming
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
     }
 
-    if (params.enableSpeakerIdentification) {
-      transcriptionParams.Settings = {
-        ...transcriptionParams.Settings,
-        ShowSpeakerLabels: true,
-        MaxSpeakerLabels: params.maxSpeakers || 2,
-      };
-    }
+    const command = new StartStreamTranscriptionCommand({
+      LanguageCode: (params.languageCode || "en-US") as any,
+      MediaEncoding: (params.mediaEncoding || "pcm") as any,
+      MediaSampleRateHertz: 16000, // Default sample rate
+      AudioStream: audioStream(),
+      ShowSpeakerLabel: params.enableSpeakerIdentification || false,
+      VocabularyName: params.vocabularyName,
+      ContentRedactionType: params.filterProfanity ? "PII" : undefined,
+    });
 
-    if (params.vocabularyName) {
-      transcriptionParams.Settings = {
-        ...transcriptionParams.Settings,
-        VocabularyName: params.vocabularyName,
-      };
-    }
-
-    if (params.filterProfanity) {
-      transcriptionParams.ContentRedaction = {
-        RedactionType: "PII",
-        RedactionOutput: "redacted",
-      };
-    }
-
-    logger.info("Starting transcription job", { jobName, params: transcriptionParams });
+    const response = await transcribeClient.send(command);
     
-    await transcribeClient.send(new StartTranscriptionJobCommand(transcriptionParams));
+    let fullTranscript = "";
+    let confidence = 0;
+    let itemCount = 0;
+    let detectedLanguage = params.languageCode || "en-US";
+    const speakerSegments: any[] = [];
 
-    // Poll for completion
-    let jobStatus = "IN_PROGRESS";
-    let attempts = 0;
-    const maxAttempts = 60; // 5 minutes max wait time
+    if (response.TranscriptResultStream) {
+      for await (const event of response.TranscriptResultStream) {
+        if (event.TranscriptEvent?.Transcript?.Results) {
+          for (const result of event.TranscriptEvent.Transcript.Results) {
+            if (result.IsPartial === false && result.Alternatives) {
+              const alternative = result.Alternatives[0];
+              if (alternative.Transcript) {
+                fullTranscript += alternative.Transcript + " ";
+              }
+              
+              // Calculate confidence
+              if (alternative.Items) {
+                for (const item of alternative.Items) {
+                  if (item.Confidence !== undefined) {
+                    confidence += item.Confidence;
+                    itemCount++;
+                  }
+                  
+                  // Extract speaker information if available
+                  if (params.enableSpeakerIdentification && item.Speaker) {
+                    speakerSegments.push({
+                      speakerLabel: `Speaker_${item.Speaker}`,
+                      startTime: item.StartTime || 0,
+                      endTime: item.EndTime || 0,
+                      text: item.Content || "",
+                    });
+                  }
+                }
+              }
+            }
+            
+            // Extract detected language
+            if (result.LanguageCode) {
+              detectedLanguage = result.LanguageCode;
+            }
+          }
+        }
+      }
+    }
+
+    const averageConfidence = itemCount > 0 ? confidence / itemCount : undefined;
     
-    while (jobStatus === "IN_PROGRESS" && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-      
-      const jobResult = await transcribeClient.send(
-        new GetTranscriptionJobCommand({ TranscriptionJobName: jobName })
-      );
-      
-      jobStatus = jobResult.TranscriptionJob?.TranscriptionJobStatus || "FAILED";
-      attempts++;
-      
-      logger.info("Transcription job status", { jobName, status: jobStatus, attempt: attempts });
-    }
-
-    if (jobStatus !== "COMPLETED") {
-      throw new Error(`Transcription job failed with status: ${jobStatus}`);
-    }
-
-    // Get the transcription result
-    const resultKey = `transcripts/${jobName}.json`;
-    const resultObject = await s3Client.send(new GetObjectCommand({
-      Bucket: bucketName,
-      Key: resultKey,
-    }));
-
-    const resultText = await resultObject.Body?.transformToString();
-    if (!resultText) {
-      throw new Error("Failed to retrieve transcription result");
-    }
-
-    const transcriptionResult = JSON.parse(resultText);
-    const transcript = transcriptionResult.results?.transcripts?.[0]?.transcript || "";
-    
-    // Extract additional information
-    const confidence = calculateAverageConfidence(transcriptionResult.results?.items || []);
-    const languageCode = transcriptionResult.results?.language_code || params.languageCode;
-    const speakerSegments = extractSpeakerSegments(transcriptionResult.results?.speaker_labels);
-
-    // Clean up temporary files
-    try {
-      // Note: In production, you might want to keep these for debugging or implement a cleanup job
-      logger.info("Transcription completed successfully", { 
-        jobName, 
-        textLength: transcript.length,
-        confidence: confidence?.toFixed(2)
-      });
-    } catch (cleanupError) {
-      logger.warn("Failed to cleanup temporary files", { error: cleanupError });
-    }
+    logger.info("Streaming transcription completed", {
+      textLength: fullTranscript.trim().length,
+      confidence: averageConfidence?.toFixed(2),
+      detectedLanguage,
+      speakerSegments: speakerSegments.length,
+    });
 
     return {
-      text: transcript,
-      confidence,
-      languageCode,
-      speakerSegments,
+      text: fullTranscript.trim(),
+      confidence: averageConfidence,
+      languageCode: detectedLanguage,
+      speakerSegments: speakerSegments.length > 0 ? speakerSegments : undefined,
     };
 
   } catch (error: any) {
-    logger.error("Transcription failed", { error: error.message, stack: error.stack });
+    logger.error("Streaming transcription failed", { error: error.message, stack: error.stack });
     throw error;
   }
-}
-
-function getFileExtension(mediaEncoding: string): string {
-  switch (mediaEncoding) {
-    case "ogg-opus":
-      return "ogg";
-    case "flac":
-      return "flac";
-    case "pcm":
-    default:
-      return "wav";
-  }
-}
-
-function getContentType(mediaEncoding: string): string {
-  switch (mediaEncoding) {
-    case "ogg-opus":
-      return "audio/ogg";
-    case "flac":
-      return "audio/flac";
-    case "pcm":
-    default:
-      return "audio/wav";
-  }
-}
-
-function calculateAverageConfidence(items: any[]): number | undefined {
-  if (!items || items.length === 0) return undefined;
-  
-  const confidenceValues = items
-    .filter(item => item.type === "pronunciation" && item.alternatives?.[0]?.confidence)
-    .map(item => parseFloat(item.alternatives[0].confidence));
-  
-  if (confidenceValues.length === 0) return undefined;
-  
-  return confidenceValues.reduce((sum, conf) => sum + conf, 0) / confidenceValues.length;
-}
-
-function extractSpeakerSegments(speakerLabels: any): any[] | undefined {
-  if (!speakerLabels?.segments) return undefined;
-  
-  return speakerLabels.segments.map((segment: any) => ({
-    speakerLabel: segment.speaker_label,
-    startTime: parseFloat(segment.start_time),
-    endTime: parseFloat(segment.end_time),
-    text: segment.items?.map((item: any) => item.content).join(" ") || "",
-  }));
 }
