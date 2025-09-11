@@ -1,0 +1,51 @@
+{
+  "name": "@gravityai-dev/aws-toolkit",
+  "version": "1.0.0",
+  "description": "AWS services toolkit for Gravity workflow system - includes Transcribe and Textract",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "npm run build",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "gravity",
+    "aws",
+    "workflow",
+    "nodes",
+    "transcribe",
+    "textract",
+    "toolkit"
+  ],
+  "author": "Gravity Team",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.886.0",
+    "@aws-sdk/client-textract": "^3.886.0",
+    "@aws-sdk/client-transcribe": "^3.886.0",
+    "@gravityai-dev/gravity-server": "file:../../../../gravity-server",
+    "@gravityai-dev/plugin-base": "file:../plugin-base",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.0.0",
+    "@types/node": "^20.19.13",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.0.0"
+  }
+}
