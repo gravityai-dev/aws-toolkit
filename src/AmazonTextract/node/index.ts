@@ -4,10 +4,11 @@
  */
 
 import { getPlatformDependencies, type EnhancedNodeDefinition } from "@gravityai-dev/plugin-base";
+import { AmazonTextractExecutor } from "./executor";
 
 export const NODE_TYPE = "AmazonTextract";
 
-export function createNodeDefinition(): EnhancedNodeDefinition {
+function createNodeDefinition(): EnhancedNodeDefinition {
   const { NodeInputType } = getPlatformDependencies();
   
   return {
@@ -123,3 +124,12 @@ export function createNodeDefinition(): EnhancedNodeDefinition {
     ],
   };
 }
+
+const definition = createNodeDefinition();
+
+export const AmazonTextractNode = {
+  definition,
+  executor: AmazonTextractExecutor,
+};
+
+export { createNodeDefinition };

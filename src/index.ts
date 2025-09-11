@@ -1,43 +1,28 @@
-/**
- * AWS Toolkit Plugin for Gravity
- * Provides AWS AI and document processing services including Transcribe and Textract
- */
-
+import { createPlugin, type GravityPluginAPI } from "@gravityai-dev/plugin-base";
 import packageJson from "../package.json";
 
-export default function createPlugin() {
-  return {
-    name: packageJson.name,
-    version: packageJson.version,
-    description: packageJson.description,
-    
-    async setup(api: any) {
+const plugin = createPlugin({
+  name: packageJson.name,
+  version: packageJson.version,
+  description: packageJson.description,
 
-      // Import and register credentials
-      const { AWSCredential } = await import("./credentials");
-      api.registerCredential(AWSCredential);
+  async setup(api: GravityPluginAPI) {
+    // Initialize platform dependencies
+    const { initializePlatformFromAPI } = await import("@gravityai-dev/plugin-base");
+    initializePlatformFromAPI(api);
 
-      // Import and register Transcribe node
-      const { createNodeDefinition: createTranscribeDefinition } = await import("./Transcribe/node");
-      const { TranscribeExecutor } = await import("./Transcribe/node/executor");
-      
-      const transcribeDefinition = createTranscribeDefinition();
-      api.registerNode({
-        definition: transcribeDefinition,
-        executor: TranscribeExecutor,
-      });
+    // Import and register Transcribe node
+    const { TranscribeNode } = await import("./Transcribe/node");
+    api.registerNode(TranscribeNode);
 
-      // Import and register AmazonTextract node
-      const { createNodeDefinition: createTextractDefinition } = await import("./AmazonTextract/node");
-      const { AmazonTextractExecutor } = await import("./AmazonTextract/node/executor");
-      
-      const textractDefinition = createTextractDefinition();
-      api.registerNode({
-        definition: textractDefinition,
-        executor: AmazonTextractExecutor,
-      });
+    // Import and register AmazonTextract node
+    const { AmazonTextractNode } = await import("./AmazonTextract/node");
+    api.registerNode(AmazonTextractNode);
 
-      // Plugin loaded successfully
-    },
-  };
-}
+    // Import and register AWS credential (will use existing if already registered)
+    const { AWSCredential } = await import("./credentials");
+    api.registerCredential(AWSCredential);
+  },
+});
+
+export default plugin;

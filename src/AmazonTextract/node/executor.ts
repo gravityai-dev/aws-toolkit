@@ -3,19 +3,15 @@
  * Handles document text extraction using Amazon Textract
  */
 
-import { getPlatformDependencies } from "@gravityai-dev/plugin-base";
+import { type NodeExecutionContext } from "@gravityai-dev/plugin-base";
 import { AmazonTextractConfig, S3FileInput, AmazonTextractOutput } from "../util/types";
 import { processS3FileWithTextract } from "../service/processTextract";
+import { PromiseNode, createLogger } from "../../shared/platform";
 import { NODE_TYPE } from "./index";
 
-export class AmazonTextractExecutor {
-  private nodeType: string;
-  private logger: any;
-
+export class AmazonTextractExecutor extends PromiseNode<AmazonTextractConfig> {
   constructor() {
-    this.nodeType = NODE_TYPE;
-    const { createLogger } = getPlatformDependencies();
-    this.logger = createLogger(`Node:${this.nodeType}`);
+    super(NODE_TYPE);
   }
 
   protected async validateConfig(config: AmazonTextractConfig): Promise<{ success: boolean; error?: string }> {
@@ -23,11 +19,12 @@ export class AmazonTextractExecutor {
     return { success: true };
   }
 
-  async executeNode(
-    inputs: Record<string, any>,
-    config: AmazonTextractConfig,
-    context: any
+  protected async executeNode(
+    inputs: Record<string, any>, 
+    config: AmazonTextractConfig, 
+    context: NodeExecutionContext
   ): Promise<AmazonTextractOutput> {
+    const logger = createLogger("AmazonTextract");
     // Get file from resolved config
     const fileInput = config.file as S3FileInput;
     

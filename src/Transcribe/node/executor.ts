@@ -3,45 +3,24 @@
  * Handles audio-to-text conversion using AWS Transcribe
  */
 
-import { getPlatformDependencies } from "@gravityai-dev/plugin-base";
+import { type NodeExecutionContext } from "@gravityai-dev/plugin-base";
 import { TranscribeConfig, TranscribeOutput } from "../util/types";
 import { transcribeAudio } from "../service/transcribeAudio";
+import { PromiseNode, createLogger } from "../../shared/platform";
 import { NODE_TYPE } from "./index";
 
-export class TranscribeExecutor {
-  private nodeType: string;
-  private logger: any;
-
+export class TranscribeExecutor extends PromiseNode<TranscribeConfig> {
   constructor() {
-    this.nodeType = NODE_TYPE;
-    const { createLogger } = getPlatformDependencies();
-    this.logger = createLogger(`Node:${this.nodeType}`);
+    super(NODE_TYPE);
   }
 
-  protected async validateConfig(config: TranscribeConfig): Promise<{ success: boolean; error?: string }> {
-    // Validate speaker identification settings
-    if (config.enableSpeakerIdentification && config.maxSpeakers) {
-      if (config.maxSpeakers < 2 || config.maxSpeakers > 10) {
-        return {
-          success: false,
-          error: "Maximum speakers must be between 2 and 10",
-        };
-      }
-    }
-
-    // Validate language settings
-    if (config.autoDetectLanguage && config.languageCode) {
-      this.logger.warn("Both autoDetectLanguage and languageCode are set. autoDetectLanguage will take precedence.");
-    }
-
-    return { success: true };
-  }
-
-  async executeNode(
+  protected async executeNode(
     inputs: Record<string, any>,
     config: TranscribeConfig,
-    context: any
+    context: NodeExecutionContext
   ): Promise<TranscribeOutput> {
+    const logger = createLogger("Transcribe");
+    
     // Get audio input - check both inputs and config
     const audioBase64 = config.audio;
 
@@ -54,7 +33,7 @@ export class TranscribeExecutor {
       throw new Error("Audio input must be a base64 encoded string");
     }
 
-    this.logger.info("Starting audio transcription", {
+    logger.info("Starting audio transcription", {
       audioLength: audioBase64.length,
       languageCode: config.languageCode,
       autoDetectLanguage: config.autoDetectLanguage,
@@ -73,10 +52,10 @@ export class TranscribeExecutor {
         maxSpeakers: config.maxSpeakers,
         vocabularyName: config.vocabularyName,
         filterProfanity: config.filterProfanity,
-        logger: this.logger
-      }, context.credentials?.aws, this.logger);
+        logger: logger
+      }, context.credentials?.aws, logger);
 
-      this.logger.info("Transcription completed successfully", {
+      logger.info("Transcription completed successfully", {
         textLength: result.text.length,
         languageCode: result.languageCode,
         confidence: result.confidence,
@@ -85,7 +64,7 @@ export class TranscribeExecutor {
 
       return result;
     } catch (error: any) {
-      this.logger.error("Transcription failed", {
+      logger.error("Transcription failed", {
         error: error.message,
         code: error.code,
         stack: error.stack,

@@ -4,10 +4,11 @@
  */
 
 import { getPlatformDependencies, type EnhancedNodeDefinition } from "@gravityai-dev/plugin-base";
+import { TranscribeExecutor } from "./executor";
 
 export const NODE_TYPE = "Transcribe";
 
-export function createNodeDefinition(): EnhancedNodeDefinition {
+function createNodeDefinition(): EnhancedNodeDefinition {
   const { NodeInputType } = getPlatformDependencies();
   
   return {
@@ -135,3 +136,12 @@ export function createNodeDefinition(): EnhancedNodeDefinition {
     ],
   };
 }
+
+const definition = createNodeDefinition();
+
+export const TranscribeNode = {
+  definition,
+  executor: TranscribeExecutor,
+};
+
+export { createNodeDefinition };
