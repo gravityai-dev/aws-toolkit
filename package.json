@@ -1,6 +1,6 @@
 {
   "name": "@gravityai-dev/aws-toolkit",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "AWS services toolkit for Gravity workflow system - includes Transcribe and Textract",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -34,8 +34,8 @@
     "@aws-sdk/client-s3": "^3.886.0",
     "@aws-sdk/client-textract": "^3.886.0",
     "@aws-sdk/client-transcribe-streaming": "^3.886.0",
-    "@gravityai-dev/gravity-server": "^0.2.108",
-    "@gravityai-dev/plugin-base": "^1.0.15",
+    "@gravityai-dev/gravity-server": "^0.2.109",
+    "@gravityai-dev/plugin-base": "^1.0.16",
     "zod": "^3.22.0"
   },
   "devDependencies": {
