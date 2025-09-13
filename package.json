@@ -1,6 +1,6 @@
 {
   "name": "@gravityai-dev/aws-toolkit",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "AWS services toolkit for Gravity workflow system - includes Transcribe and Textract",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
