@@ -12,7 +12,7 @@ function createNodeDefinition(): EnhancedNodeDefinition {
   const { NodeInputType } = getPlatformDependencies();
   
   return {
-    packageVersion: "1.0.14",
+    packageVersion: "1.0.15",
     type: NODE_TYPE,
     name: "Transcribe",
     description: "Convert audio to text using AWS Transcribe",
