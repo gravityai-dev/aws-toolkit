@@ -12,7 +12,7 @@ function createNodeDefinition(): EnhancedNodeDefinition {
   const { NodeInputType } = getPlatformDependencies();
   
   return {
-    packageVersion: "1.0.12",
+    packageVersion: "1.0.13",
     type: NODE_TYPE,
     name: "Amazon Textract",
     description: "Extract text from documents in S3 using Amazon Textract",
